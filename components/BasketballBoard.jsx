@@ -66,6 +66,32 @@ const BasketballBoard = () => {
   const boardRef = useRef(null);
   const t = translations[language];
 
+  // เพิ่มฟังก์ชัน smoothPath เพื่อคำนวณเส้นทางที่ราบรื่นจากจุดต่างๆ
+  const smoothPath = (points) => {
+    if (points.length < 3) {
+      if (points.length === 2) {
+        return `M ${points[0].x} ${points[0].y} L ${points[1].x} ${points[1].y}`;
+      }
+      if (points.length === 1) {
+        return `M ${points[0].x} ${points[0].y}`;
+      }
+      return '';
+    }
+    let path = `M ${points[0].x} ${points[0].y}`;
+    for (let i = 1; i < points.length - 1; i++) {
+      const p0 = points[i - 1];
+      const p1 = points[i];
+      const p2 = points[i + 1];
+      const cp1x = p1.x + (p0.x - p2.x) / 6;
+      const cp1y = p1.y + (p0.y - p2.y) / 6;
+      const cp2x = p1.x + (p2.x - p0.x) / 6;
+      const cp2y = p1.y + (p2.y - p0.y) / 6;
+      path += ` C ${cp1x} ${cp1y} ${cp2x} ${cp2y} ${p1.x} ${p1.y}`;
+    }
+    path += ` L ${points[points.length - 1].x} ${points[points.length - 1].y}`;
+    return path;
+  };
+
   const LanguageSelector = () => (
     <div className="flex gap-2 mb-4">
       <Button
