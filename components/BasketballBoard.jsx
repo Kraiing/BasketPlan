@@ -403,6 +403,7 @@ const BasketballBoard = () => {
         <div
           ref={boardRef}
           className="w-full h-96 bg-red-100 relative border-4 border-indigo-300 rounded-3xl shadow-lg overflow-hidden"
+          style={{ touchAction: 'none' }}  // เพิ่มบรรทัดนี้เพื่อป้องกันการเลื่อนหน้าจอบนอุปกรณ์ที่สามารถใช้ touch event
           onMouseDown={handleMouseDown}
           onTouchStart={handleMouseDown}
           onMouseMove={handleMouseMove}
