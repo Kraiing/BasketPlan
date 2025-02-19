@@ -159,11 +159,22 @@ const BasketballBoard = () => {
     addToHistory({ arrows, players: newPlayers });
   };
 
-  const handleMouseDown = (e) => {
+  // Helper function: รับค่าพิกัดจาก mouse หรือ touch event
+  const getEventCoordinates = (e) => {
     const rect = boardRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    let clientX, clientY;
+    if (e.touches && e.touches.length > 0) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+    return { x: clientX - rect.left, y: clientY - rect.top };
+  };
 
+  const handleMouseDown = (e) => {
+    const { x, y } = getEventCoordinates(e);
     if (selectedTool === 'move') {
       const playerIndex = players.findIndex(p => 
         Math.sqrt(Math.pow(p.x - x, 2) + Math.pow(p.y - y, 2)) < 15
@@ -178,12 +189,11 @@ const BasketballBoard = () => {
       setIsDrawing(true);
       setCurrentPath([{ x, y }]);
     } else if (selectedTool === 'eraser') {
-      // ตรวจสอบว่าคลิกใกล้เส้นลูกศรหรือไม่
       const arrowIndex = arrows.findIndex(arrow => {
         return arrow.points.some(point => {
           const dx = point.x - x;
           const dy = point.y - y;
-          return Math.sqrt(dx * dx + dy * dy) < 20; // ระยะห่างในการตรวจจับการคลิก
+          return Math.sqrt(dx * dx + dy * dy) < 20;
         });
       });
       
@@ -195,45 +205,8 @@ const BasketballBoard = () => {
     }
   };
 
-  const smoothPath = (points) => {
-    if (points.length < 3) {
-      if (points.length === 2) {
-        return `M ${points[0].x} ${points[0].y} L ${points[1].x} ${points[1].y}`;
-      }
-      if (points.length === 1) {
-        return `M ${points[0].x} ${points[0].y}`;
-      }
-      return '';
-    }
-
-    let path = `M ${points[0].x} ${points[0].y}`;
-
-    // ใช้ Bezier curves สำหรับทุกๆ 3 จุด
-    for (let i = 1; i < points.length - 1; i++) {
-      const p0 = points[i - 1];
-      const p1 = points[i];
-      const p2 = points[i + 1];
-
-      // คำนวณจุดควบคุมสำหรับ curve
-      const cp1x = p1.x + (p0.x - p2.x) / 6;
-      const cp1y = p1.y + (p0.y - p2.y) / 6;
-      const cp2x = p1.x + (p2.x - p0.x) / 6;
-      const cp2y = p1.y + (p2.y - p0.y) / 6;
-
-      path += ` C ${cp1x} ${cp1y} ${cp2x} ${cp2y} ${p1.x} ${p1.y}`;
-    }
-
-    // เพิ่มจุดสุดท้าย
-    path += ` L ${points[points.length - 1].x} ${points[points.length - 1].y}`;
-
-    return path;
-  };
-
   const handleMouseMove = (e) => {
-    const rect = boardRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
+    const { x, y } = getEventCoordinates(e);
     if (selectedTool === 'move') {
       const draggedPlayer = players.find(p => p.isDragging);
       if (draggedPlayer) {
@@ -243,13 +216,12 @@ const BasketballBoard = () => {
         setPlayers(newPlayers);
       }
     } else if (selectedTool === 'arrow' && isDrawing) {
-      // เพิ่มจุดใหม่เมื่อระยะห่างมากพอ
       const lastPoint = currentPath[currentPath.length - 1];
       const dx = x - lastPoint.x;
       const dy = y - lastPoint.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
       
-      if (distance > 10) { // ลดจำนวนจุดที่เก็บ
+      if (distance > 10) {
         setCurrentPath(prev => [...prev, { x, y }]);
       }
     }
@@ -339,75 +311,78 @@ const BasketballBoard = () => {
         </div>
 
         <div className="mb-4 flex gap-4">
-                      <Button
-              onClick={handleUndo}
-              disabled={historyIndex <= 0}
-              variant={selectedTool === 'undo' ? 'default' : 'outline'}
-              className="rounded-full shadow-md hover:scale-105 transition-transform"
-            >
-              <Undo2 className="mr-2" />
-              {t.undo}
-            </Button>
-            <Button
-              onClick={handleRedo}
-              disabled={historyIndex >= history.length - 1}
-              variant={selectedTool === 'redo' ? 'default' : 'outline'}
-              className="rounded-full shadow-md hover:scale-105 transition-transform"
-            >
-              <Redo2 className="mr-2" />
-              {t.redo}
-            </Button>
-            <Button
-              onClick={() => setSelectedTool('move')}
-              variant={selectedTool === 'move' ? 'default' : 'outline'}
-              className={`rounded-full shadow-md hover:scale-105 transition-transform ${
-                selectedTool === 'move' 
-                  ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white ring-2 ring-indigo-300 ring-offset-2' 
-                  : ''
-              }`}
-            >
-              {t.movePlayer}
-            </Button>
-            <Button
-              onClick={() => setSelectedTool('arrow')}
-              variant={selectedTool === 'arrow' ? 'default' : 'outline'}
-              className={`rounded-full shadow-md hover:scale-105 transition-transform ${
-                selectedTool === 'arrow' 
-                  ? 'bg-gradient-to-r from-green-500 to-teal-500 text-white ring-2 ring-green-300 ring-offset-2' 
-                  : ''
-              }`}
-            >
-              <ArrowRight className="mr-2" />
-              {t.drawArrow}
-            </Button>
-            <Button
-              onClick={() => setSelectedTool('eraser')}
-              variant={selectedTool === 'eraser' ? 'default' : 'outline'}
-              className={`rounded-full shadow-md hover:scale-105 transition-transform ${
-                selectedTool === 'eraser' 
-                  ? 'bg-gradient-to-r from-orange-500 to-yellow-500 text-white ring-2 ring-orange-300 ring-offset-2' 
-                  : ''
-              }`}
-            >
-              <Eraser className="mr-2" />
-              ลบลูกศร
-            </Button>
-            <Button 
-              onClick={clearBoard} 
-              variant="destructive"
-              className="rounded-full shadow-md hover:scale-105 transition-transform"
-            >
-              <Trash2 className="mr-2" />
-              {t.clearBoard}
-            </Button>
+          <Button
+            onClick={handleUndo}
+            disabled={historyIndex <= 0}
+            variant={selectedTool === 'undo' ? 'default' : 'outline'}
+            className="rounded-full shadow-md hover:scale-105 transition-transform"
+          >
+            <Undo2 className="mr-2" />
+            {t.undo}
+          </Button>
+          <Button
+            onClick={handleRedo}
+            disabled={historyIndex >= history.length - 1}
+            variant={selectedTool === 'redo' ? 'default' : 'outline'}
+            className="rounded-full shadow-md hover:scale-105 transition-transform"
+          >
+            <Redo2 className="mr-2" />
+            {t.redo}
+          </Button>
+          <Button
+            onClick={() => setSelectedTool('move')}
+            variant={selectedTool === 'move' ? 'default' : 'outline'}
+            className={`rounded-full shadow-md hover:scale-105 transition-transform ${
+              selectedTool === 'move' 
+                ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white ring-2 ring-indigo-300 ring-offset-2' 
+                : ''
+            }`}
+          >
+            {t.movePlayer}
+          </Button>
+          <Button
+            onClick={() => setSelectedTool('arrow')}
+            variant={selectedTool === 'arrow' ? 'default' : 'outline'}
+            className={`rounded-full shadow-md hover:scale-105 transition-transform ${
+              selectedTool === 'arrow' 
+                ? 'bg-gradient-to-r from-green-500 to-teal-500 text-white ring-2 ring-green-300 ring-offset-2' 
+                : ''
+            }`}
+          >
+            <ArrowRight className="mr-2" />
+            {t.drawArrow}
+          </Button>
+          <Button
+            onClick={() => setSelectedTool('eraser')}
+            variant={selectedTool === 'eraser' ? 'default' : 'outline'}
+            className={`rounded-full shadow-md hover:scale-105 transition-transform ${
+              selectedTool === 'eraser' 
+                ? 'bg-gradient-to-r from-orange-500 to-yellow-500 text-white ring-2 ring-orange-300 ring-offset-2' 
+                : ''
+            }`}
+          >
+            <Eraser className="mr-2" />
+            {t.eraseArrow}
+          </Button>
+          <Button 
+            onClick={clearBoard} 
+            variant="destructive"
+            className="rounded-full shadow-md hover:scale-105 transition-transform"
+          >
+            <Trash2 className="mr-2" />
+            {t.clearBoard}
+          </Button>
         </div>
 
         <div
           ref={boardRef}
           className="w-full h-96 bg-red-100 relative border-4 border-indigo-300 rounded-3xl shadow-lg overflow-hidden"
           onMouseDown={handleMouseDown}
+          onTouchStart={handleMouseDown}
           onMouseMove={handleMouseMove}
+          onTouchMove={handleMouseMove}
           onMouseUp={handleMouseUp}
+          onTouchEnd={handleMouseUp}
           onMouseLeave={() => {
             if (selectedTool === 'move') {
               const draggedPlayer = players.find(p => p.isDragging);
@@ -419,38 +394,15 @@ const BasketballBoard = () => {
             }
           }}
         >
-          {/* สนามบาสเกตบอล */}
           <svg width="100%" height="100%" className="absolute top-0 left-0">
-            {/* พื้นสนาม */}
             <rect x="0" y="0" width="100%" height="100%" fill="#FFB6C1" opacity="0.3"/>
-            
-            {/* เส้นขอบสนาม */}
-            <rect x="5%" y="5%" width="90%" height="90%" 
-                  fill="none" stroke="white" strokeWidth="3"/>
-            
-            {/* เส้นกลางสนาม */}
-            <line x1="50%" y1="5%" x2="50%" y2="95%" 
-                  stroke="white" strokeWidth="3"/>
-            
-            {/* วงกลมกลางสนาม */}
-            <circle cx="50%" cy="50%" r="60" 
-                    fill="none" stroke="white" strokeWidth="3"/>
-            
-            {/* ฝั่งซ้าย */}
-            {/* เขตโทษฝั่งซ้าย */}
-            <rect x="5%" y="30%" width="15%" height="40%" 
-                  fill="none" stroke="white" strokeWidth="3"/>
-            <path d="M 20% 30% C 25% 30%, 25% 70%, 20% 70%"
-                  fill="none" stroke="white" strokeWidth="3"/>
-            
-            {/* ฝั่งขวา */}
-            {/* เขตโทษฝั่งขวา */}
-            <rect x="80%" y="30%" width="15%" height="40%" 
-                  fill="none" stroke="white" strokeWidth="3"/>
-            <path d="M 80% 30% C 75% 30%, 75% 70%, 80% 70%"
-                  fill="none" stroke="white" strokeWidth="3"/>
-
-            {/* ลูกศร */}
+            <rect x="5%" y="5%" width="90%" height="90%" fill="none" stroke="white" strokeWidth="3"/>
+            <line x1="50%" y1="5%" x2="50%" y2="95%" stroke="white" strokeWidth="3"/>
+            <circle cx="50%" cy="50%" r="60" fill="none" stroke="white" strokeWidth="3"/>
+            <rect x="5%" y="30%" width="15%" height="40%" fill="none" stroke="white" strokeWidth="3"/>
+            <path d="M 20% 30% C 25% 30%, 25% 70%, 20% 70%" fill="none" stroke="white" strokeWidth="3"/>
+            <rect x="80%" y="30%" width="15%" height="40%" fill="none" stroke="white" strokeWidth="3"/>
+            <path d="M 80% 30% C 75% 30%, 75% 70%, 80% 70%" fill="none" stroke="white" strokeWidth="3"/>
             {arrows.map((arrow, index) => (
               <g key={index}>
                 <path
@@ -464,8 +416,6 @@ const BasketballBoard = () => {
                 />
               </g>
             ))}
-            
-            {/* ลูกศรที่กำลังวาด */}
             {isDrawing && currentPath.length > 1 && (
               <path
                 d={smoothPath(currentPath)}
@@ -478,7 +428,6 @@ const BasketballBoard = () => {
                 markerEnd="url(#arrowhead)"
               />
             )}
-            
             <defs>
               <marker
                 id="arrowhead"
@@ -493,7 +442,6 @@ const BasketballBoard = () => {
             </defs>
           </svg>
 
-          {/* ผู้เล่น */}
           {players.map((player) => (
             <div
               key={player.id}
